@@ -8,7 +8,6 @@
 * { box-sizing: border-box; font-family: Arial; }
 body { margin: 0; background: black; color: white; overflow: hidden; }
 
-/* MENU */
 #menu {
   position: fixed;
   inset: 0;
@@ -45,7 +44,6 @@ button {
   text-align: center;
 }
 
-/* GAME */
 #game { display: none; }
 canvas { display: block; margin: auto; background: #111; }
 
@@ -65,7 +63,6 @@ canvas { display: block; margin: auto; background: #111; }
 
 <body>
 
-<!-- MENU -->
 <div id="menu">
   <h1>🔪 SURVIVE THE NIGHT</h1>
   <button onclick="openCharacters()">PLAY</button>
@@ -79,7 +76,6 @@ canvas { display: block; margin: auto; background: #111; }
   </div>
 </div>
 
-<!-- GAME -->
 <div id="game">
   <div id="hud">❤️ <span id="hp">100</span></div>
   <div id="role"></div>
@@ -105,7 +101,6 @@ function start(selectedClass) {
   document.getElementById("menu").style.display = "none";
   document.getElementById("game").style.display = "block";
 
-  // ROLE CHANCE
   isKiller = Math.random() < 0.2;
 
   if (isKiller) {
@@ -120,7 +115,7 @@ function initGame(cls) {
   player = { x: 100, y: 100, size: 20, speed: 3, hp: 100 };
   killer = {
     x: 600, y: 300, size: 26,
-    speed: 2.2,
+    speed: 3,
     cooldown: 0,
     rage: 0
   };
@@ -131,50 +126,51 @@ function initGame(cls) {
 
   document.getElementById("hp").textContent = player.hp;
   document.getElementById("role").textContent =
-    isKiller ? "🔪 ROLE: KILLER" : "🎮 ROLE: SURVIVOR";
+    isKiller ? "🔪 ROLE: KILLER (WASD + CLICK)" : "🎮 ROLE: SURVIVOR";
 
   loop();
 }
 
+canvas.addEventListener("mousedown", () => {
+  if (isKiller && killer.cooldown <= 0) {
+    const dx = player.x - killer.x;
+    const dy = player.y - killer.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 50) {
+      player.hp -= 20;
+      document.getElementById("hp").textContent = player.hp;
+      if (player.hp <= 0) end("💀 HAS MUERTO");
+    }
+    killer.cooldown = 60;
+  }
+});
+
 function update() {
-  // PLAYER MOVE
-  if (!isKiller) {
+  if (isKiller) {
+    if (keys["w"]||keys["ArrowUp"]) killer.y -= killer.speed;
+    if (keys["s"]||keys["ArrowDown"]) killer.y += killer.speed;
+    if (keys["a"]||keys["ArrowLeft"]) killer.x -= killer.speed;
+    if (keys["d"]||keys["ArrowRight"]) killer.x += killer.speed;
+  } else {
     if (keys["w"]||keys["ArrowUp"]) player.y -= player.speed;
     if (keys["s"]||keys["ArrowDown"]) player.y += player.speed;
     if (keys["a"]||keys["ArrowLeft"]) player.x -= player.speed;
     if (keys["d"]||keys["ArrowRight"]) player.x += player.speed;
-  }
 
-  // KILLER AI / CONTROL
-  if (!isKiller) {
     let dx = player.x - killer.x;
     let dy = player.y - killer.y;
     let dist = Math.hypot(dx, dy);
-
     killer.x += dx / dist * killer.speed;
     killer.y += dy / dist * killer.speed;
-
-    // ATTACK COOLDOWN
-    if (dist < player.size + killer.size && killer.cooldown <= 0) {
-      player.hp -= 10;
-      killer.cooldown = 60;
-      document.getElementById("hp").textContent = player.hp;
-      if (player.hp <= 0) end("💀 HAS MUERTO");
-    }
   }
 
-  // KILLER SKILLS
-  if (!isKiller && keys[" "] && killer.rage <= 0) {
-    killer.speed = 4;
+  if (keys[" "] && killer.rage <= 0) {
+    killer.speed = 5;
     killer.rage = 120;
   }
 
-  // TIMERS
   if (killer.cooldown > 0) killer.cooldown--;
-  if (killer.rage > 0) {
-    killer.rage--;
-    if (killer.rage === 0) killer.speed = 2.2;
-  }
+  if (killer.rage > 0 && --killer.rage === 0) killer.speed = 3;
 }
 
 function draw() {
