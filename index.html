@@ -5,16 +5,10 @@
 <title>Survive The Night</title>
 
 <style>
-* { box-sizing: border-box; font-family: Arial, sans-serif; }
+* { box-sizing: border-box; font-family: Arial; }
+body { margin: 0; background: black; color: white; overflow: hidden; }
 
-body {
-  margin: 0;
-  background: black;
-  color: white;
-  overflow: hidden;
-}
-
-/* ===== MENU ===== */
+/* MENU */
 #menu {
   position: fixed;
   inset: 0;
@@ -23,8 +17,6 @@ body {
   justify-content: center;
   align-items: center;
 }
-
-h1 { font-size: 48px; margin-bottom: 10px; }
 
 button {
   padding: 14px 30px;
@@ -39,39 +31,34 @@ button {
 
 #characters {
   display: none;
-  gap: 15px;
+  gap: 12px;
   margin-top: 30px;
 }
 
 .character {
   width: 140px;
-  padding: 15px;
+  padding: 12px;
   background: #050505;
   border: 2px solid #555;
-  border-radius: 12px;
-  text-align: center;
+  border-radius: 10px;
   cursor: pointer;
+  text-align: center;
 }
 
-.character.selected {
-  border-color: #22c55e;
-}
-
-/* ===== GAME ===== */
-#game {
-  display: none;
-}
-
-canvas {
-  display: block;
-  margin: auto;
-  background: #111;
-}
+/* GAME */
+#game { display: none; }
+canvas { display: block; margin: auto; background: #111; }
 
 #hud {
   position: fixed;
   top: 10px;
   left: 10px;
+}
+
+#role {
+  position: fixed;
+  top: 10px;
+  right: 10px;
 }
 </style>
 </head>
@@ -84,35 +71,22 @@ canvas {
   <button onclick="openCharacters()">PLAY</button>
 
   <div id="characters">
-    <div class="character" onclick="selectClass('Runner')">🏃 Runner</div>
-    <div class="character" onclick="selectClass('Medic')">💉 Medic</div>
-    <div class="character" onclick="selectClass('Tank')">🛡 Tank</div>
-    <div class="character" onclick="selectClass('Sneaky')">👁 Sneaky</div>
-    <div class="character" onclick="selectClass('Balanced')">⚖ Balanced</div>
+    <div class="character" onclick="start('Runner')">🏃 Runner</div>
+    <div class="character" onclick="start('Medic')">💉 Medic</div>
+    <div class="character" onclick="start('Tank')">🛡 Tank</div>
+    <div class="character" onclick="start('Sneaky')">👁 Sneaky</div>
+    <div class="character" onclick="start('Balanced')">⚖ Balanced</div>
   </div>
 </div>
 
 <!-- GAME -->
 <div id="game">
-  <div id="hud">❤️ Vida: <span id="hp">100</span></div>
+  <div id="hud">❤️ <span id="hp">100</span></div>
+  <div id="role"></div>
   <canvas id="canvas" width="800" height="500"></canvas>
 </div>
 
 <script>
-let selectedClass = null;
-
-function openCharacters() {
-  document.getElementById("characters").style.display = "flex";
-}
-
-function selectClass(cls) {
-  selectedClass = cls;
-  document.getElementById("menu").style.display = "none";
-  document.getElementById("game").style.display = "block";
-  startGame();
-}
-
-/* ===== GAME LOGIC ===== */
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
@@ -121,51 +95,94 @@ document.addEventListener("keydown", e => keys[e.key] = true);
 document.addEventListener("keyup", e => keys[e.key] = false);
 
 let player, killer;
+let isKiller = false;
 
-function startGame() {
+function openCharacters() {
+  document.getElementById("characters").style.display = "flex";
+}
+
+function start(selectedClass) {
+  document.getElementById("menu").style.display = "none";
+  document.getElementById("game").style.display = "block";
+
+  // ROLE CHANCE
+  isKiller = Math.random() < 0.2;
+
+  if (isKiller) {
+    selectedClass = ["Runner","Medic","Tank","Sneaky","Balanced"]
+      [Math.floor(Math.random()*5)];
+  }
+
+  initGame(selectedClass);
+}
+
+function initGame(cls) {
   player = { x: 100, y: 100, size: 20, speed: 3, hp: 100 };
-  killer = { x: 600, y: 300, size: 25, speed: 2 };
+  killer = {
+    x: 600, y: 300, size: 26,
+    speed: 2.2,
+    cooldown: 0,
+    rage: 0
+  };
 
-  if (selectedClass === "Runner") player.speed = 4;
-  if (selectedClass === "Tank") player.hp = 150;
-  if (selectedClass === "Medic") player.hp = 120;
+  if (cls === "Runner") player.speed = 4;
+  if (cls === "Tank") player.hp = 150;
+  if (cls === "Medic") player.hp = 120;
 
   document.getElementById("hp").textContent = player.hp;
+  document.getElementById("role").textContent =
+    isKiller ? "🔪 ROLE: KILLER" : "🎮 ROLE: SURVIVOR";
+
   loop();
 }
 
 function update() {
-  if (keys["w"] || keys["ArrowUp"]) player.y -= player.speed;
-  if (keys["s"] || keys["ArrowDown"]) player.y += player.speed;
-  if (keys["a"] || keys["ArrowLeft"]) player.x -= player.speed;
-  if (keys["d"] || keys["ArrowRight"]) player.x += player.speed;
-
-  // Killer follows player
-  let dx = player.x - killer.x;
-  let dy = player.y - killer.y;
-  let dist = Math.hypot(dx, dy);
-
-  if (dist > 0) {
-    killer.x += dx / dist * killer.speed;
-    killer.y += dy / dist * killer.speed;
+  // PLAYER MOVE
+  if (!isKiller) {
+    if (keys["w"]||keys["ArrowUp"]) player.y -= player.speed;
+    if (keys["s"]||keys["ArrowDown"]) player.y += player.speed;
+    if (keys["a"]||keys["ArrowLeft"]) player.x -= player.speed;
+    if (keys["d"]||keys["ArrowRight"]) player.x += player.speed;
   }
 
-  // Collision
-  if (dist < player.size + killer.size) {
-    player.hp -= 0.5;
-    document.getElementById("hp").textContent = Math.floor(player.hp);
-    if (player.hp <= 0) gameOver();
+  // KILLER AI / CONTROL
+  if (!isKiller) {
+    let dx = player.x - killer.x;
+    let dy = player.y - killer.y;
+    let dist = Math.hypot(dx, dy);
+
+    killer.x += dx / dist * killer.speed;
+    killer.y += dy / dist * killer.speed;
+
+    // ATTACK COOLDOWN
+    if (dist < player.size + killer.size && killer.cooldown <= 0) {
+      player.hp -= 10;
+      killer.cooldown = 60;
+      document.getElementById("hp").textContent = player.hp;
+      if (player.hp <= 0) end("💀 HAS MUERTO");
+    }
+  }
+
+  // KILLER SKILLS
+  if (!isKiller && keys[" "] && killer.rage <= 0) {
+    killer.speed = 4;
+    killer.rage = 120;
+  }
+
+  // TIMERS
+  if (killer.cooldown > 0) killer.cooldown--;
+  if (killer.rage > 0) {
+    killer.rage--;
+    if (killer.rage === 0) killer.speed = 2.2;
   }
 }
 
 function draw() {
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  // Player
   ctx.fillStyle = "#22c55e";
   ctx.fillRect(player.x, player.y, player.size, player.size);
 
-  // Killer
   ctx.fillStyle = "#ef4444";
   ctx.fillRect(killer.x, killer.y, killer.size, killer.size);
 }
@@ -176,8 +193,8 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-function gameOver() {
-  alert("💀 HAS MUERTO");
+function end(msg) {
+  alert(msg);
   location.reload();
 }
 </script>
