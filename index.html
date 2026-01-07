@@ -18,11 +18,7 @@ button{
   color:white;
   cursor:pointer
 }
-#characters{
-  display:none;
-  gap:10px;
-  margin-top:25px
-}
+#characters{display:none;gap:10px;margin-top:25px}
 .character{
   width:140px;
   padding:10px;
@@ -75,51 +71,30 @@ const CLASSES={
 let player,isKiller,killer,walls=[],survivors=[]
 
 // ===== MENU =====
-function openChars(){
-  characters.style.display="flex"
-}
+function openChars(){ characters.style.display="flex" }
 
-// ===== START GAME =====
+// ===== START =====
 function startGame(cls){
   menu.style.display="none"
   game.style.display="block"
 
   isKiller=Math.random()<0.2
-  if(isKiller){
-    cls=Object.keys(CLASSES)[Math.floor(Math.random()*4)]
-  }
+  if(isKiller) cls=Object.keys(CLASSES)[Math.floor(Math.random()*4)]
 
-  // 🔵 JUGADOR (AZUL)
-  player={
-    x:120,y:120,size:20,
-    spd:CLASSES[cls].spd,
-    hp:CLASSES[cls].hp
-  }
+  player={x:120,y:120,size:20,spd:CLASSES[cls].spd,hp:CLASSES[cls].hp}
 
-  // 🔴 KILLER
-  killer={
-    x:750,y:300,size:26,
-    spd:2.6,
-    cool:0
-  }
+  killer={x:750,y:300,size:26,spd:5,cool:0,stuck:0}
 
-  // 🟩 SPAWN GRUPAL DE SURVIVORS
   survivors=[]
-  const spawnX=150
-  const spawnY=150
-
+  const spawnX=150, spawnY=150
   for(let i=0;i<4;i++){
     survivors.push({
-      x:spawnX+Math.random()*15,
-      y:spawnY+Math.random()*15,
-      size:18,
-      hp:60,
-      dirX:0,
-      dirY:0
+      x:spawnX+Math.random()*10,
+      y:spawnY+Math.random()*10,
+      size:18,hp:60,dirX:0,dirY:0
     })
   }
 
-  // 🧱 PAREDES
   walls=[
     {x:300,y:150,w:300,h:20},
     {x:300,y:380,w:300,h:20},
@@ -129,35 +104,38 @@ function startGame(cls){
 
   hp.textContent=player.hp
   role.textContent=isKiller?"🔪 KILLER":"🎮 SURVIVOR"
-
   loop()
 }
 
-// ===== MOVIMIENTO Y COLISION =====
+// ===== LIMITES DEL MAPA =====
+function clamp(ent){
+  ent.x=Math.max(0,Math.min(c.width-ent.size,ent.x))
+  ent.y=Math.max(0,Math.min(c.height-ent.size,ent.y))
+}
+
+// ===== MOVIMIENTO =====
 function move(ent,dx,dy){
-  ent.x+=dx
-  ent.y+=dy
+  ent.x+=dx; ent.y+=dy
   for(let w of walls){
     if(ent.x<w.x+w.w&&ent.x+ent.size>w.x&&
        ent.y<w.y+w.h&&ent.y+ent.size>w.y){
-      ent.x-=dx
-      ent.y-=dy
+      ent.x-=dx; ent.y-=dy
     }
   }
+  clamp(ent)
 }
 
 function moveAI(ent,dx,dy){
   let ox=ent.x, oy=ent.y
-  ent.x+=dx
-  ent.y+=dy
+  ent.x+=dx; ent.y+=dy
   for(let w of walls){
     if(ent.x<w.x+w.w&&ent.x+ent.size>w.x&&
        ent.y<w.y+w.h&&ent.y+ent.size>w.y){
-      ent.x=ox
-      ent.y=oy
+      ent.x=ox; ent.y=oy
       return false
     }
   }
+  clamp(ent)
   return true
 }
 
@@ -177,14 +155,12 @@ function update(){
     if(keys.d) move(player,player.spd,0)
   }
 
-  // 🟩 SURVIVOR IA
+  // SURVIVORS IA
   survivors.forEach(s=>{
     if(s.hp<=0) return
-    let dx=s.x-killer.x
-    let dy=s.y-killer.y
+    let dx=s.x-killer.x, dy=s.y-killer.y
     let d=Math.hypot(dx,dy)
-
-    if(d<160){
+    if(d<180){
       moveAI(s,(dx/d)*2,(dy/d)*2)
     }else{
       if(Math.random()<0.02){
@@ -195,13 +171,12 @@ function update(){
     }
   })
 
-  // 🔴 KILLER IA
+  // KILLER IA AVANZADA
   if(!isKiller){
     let targets=[player,...survivors].filter(t=>t.hp>0)
     let target=targets.reduce((a,b)=>{
-      let da=Math.hypot(a.x-killer.x,a.y-killer.y)
-      let db=Math.hypot(b.x-killer.x,b.y-killer.y)
-      return db<da?b:a
+      return Math.hypot(b.x-killer.x,b.y-killer.y)
+           < Math.hypot(a.x-killer.x,a.y-killer.y) ? b : a
     })
 
     let dx=target.x-killer.x
@@ -212,13 +187,14 @@ function update(){
       let mx=(dx/d)*killer.spd
       let my=(dy/d)*killer.spd
       if(!moveAI(killer,mx,my)){
+        killer.stuck++
         moveAI(killer,my,-mx)
-      }
+      }else killer.stuck=0
     }
 
     if(d<40 && killer.cool<=0){
       target.hp-=15
-      killer.cool=60
+      killer.cool=45
       if(target===player){
         hp.textContent=player.hp
         if(player.hp<=0) end("💀 MORISTE")
@@ -236,15 +212,12 @@ function draw(){
   ctx.fillStyle="#333"
   walls.forEach(w=>ctx.fillRect(w.x,w.y,w.w,w.h))
 
-  // 🔵 JUGADOR
   ctx.fillStyle="#2563eb"
   ctx.fillRect(player.x,player.y,player.size,player.size)
 
-  // 🟩 SURVIVORS
   ctx.fillStyle="#22c55e"
   survivors.forEach(s=>s.hp>0&&ctx.fillRect(s.x,s.y,s.size,s.size))
 
-  // 🔴 KILLER
   ctx.fillStyle="#ef4444"
   ctx.fillRect(killer.x,killer.y,killer.size,killer.size)
 }
