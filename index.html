@@ -9,9 +9,28 @@
 body{margin:0;background:black;color:white;overflow:hidden}
 #menu,#game{position:fixed;inset:0}
 #menu{display:flex;flex-direction:column;align-items:center;justify-content:center}
-button{padding:14px 30px;font-size:18px;border:none;border-radius:10px;background:#ef4444;color:white;cursor:pointer}
-#characters{display:none;gap:10px;margin-top:25px}
-.character{width:140px;padding:10px;border:2px solid #444;border-radius:10px;text-align:center;cursor:pointer}
+button{
+  padding:14px 30px;
+  font-size:18px;
+  border:none;
+  border-radius:10px;
+  background:#ef4444;
+  color:white;
+  cursor:pointer
+}
+#characters{
+  display:none;
+  gap:10px;
+  margin-top:25px
+}
+.character{
+  width:140px;
+  padding:10px;
+  border:2px solid #444;
+  border-radius:10px;
+  text-align:center;
+  cursor:pointer
+}
 canvas{display:block;margin:auto;background:#111}
 #hud{position:fixed;top:10px;left:10px}
 #role{position:fixed;top:10px;right:10px}
@@ -21,150 +40,215 @@ canvas{display:block;margin:auto;background:#111}
 <body>
 
 <div id="menu">
-<h1>🔪 SURVIVE THE NIGHT</h1>
-<button onclick="openChars()">PLAY</button>
-<div id="characters">
-<div class="character" onclick="startGame('Runner')">Runner</div>
-<div class="character" onclick="startGame('Medic')">Medic</div>
-<div class="character" onclick="startGame('Tank')">Tank</div>
-<div class="character" onclick="startGame('Sneaky')">Sneaky</div>
-</div>
+  <h1>🔪 SURVIVE THE NIGHT</h1>
+  <button onclick="openChars()">PLAY</button>
+  <div id="characters">
+    <div class="character" onclick="startGame('Runner')">Runner</div>
+    <div class="character" onclick="startGame('Medic')">Medic</div>
+    <div class="character" onclick="startGame('Tank')">Tank</div>
+    <div class="character" onclick="startGame('Sneaky')">Sneaky</div>
+  </div>
 </div>
 
 <div id="game" style="display:none">
-<div id="hud">❤️ <span id="hp"></span></div>
-<div id="role"></div>
-<canvas id="c" width="900" height="550"></canvas>
+  <div id="hud">❤️ <span id="hp"></span></div>
+  <div id="role"></div>
+  <canvas id="c" width="900" height="550"></canvas>
 </div>
 
 <script>
-const c=document.getElementById("c"),ctx=c.getContext("2d")
+const c=document.getElementById("c")
+const ctx=c.getContext("2d")
+
 let keys={}
 document.onkeydown=e=>keys[e.key]=true
 document.onkeyup=e=>keys[e.key]=false
 
+// ===== CLASES =====
 const CLASSES={
-Runner:{spd:3,hp:100},
-Medic:{spd:4,hp:80},
-Tank:{spd:1,hp:150},
-Sneaky:{spd:4.5,hp:90}
+  Runner:{spd:3,hp:100},
+  Medic:{spd:3.5,hp:80},
+  Tank:{spd:1,hp:150},
+  Sneaky:{spd:4,hp:90}
 }
 
 let player,isKiller,killer,walls=[],survivors=[]
 
-function openChars(){characters.style.display="flex"}
+// ===== MENU =====
+function openChars(){
+  characters.style.display="flex"
+}
 
+// ===== START GAME =====
 function startGame(cls){
-menu.style.display="none"
-game.style.display="block"
+  menu.style.display="none"
+  game.style.display="block"
 
-isKiller=Math.random()<0.2
-if(isKiller) cls=Object.keys(CLASSES)[Math.floor(Math.random()*4)]
+  isKiller=Math.random()<0.2
+  if(isKiller){
+    cls=Object.keys(CLASSES)[Math.floor(Math.random()*4)]
+  }
 
-player={
-x:100,y:100,size:20,
-spd:CLASSES[cls].spd,
-hp:CLASSES[cls].hp
+  player={
+    x:120,y:120,size:20,
+    spd:CLASSES[cls].spd,
+    hp:CLASSES[cls].hp
+  }
+
+  killer={
+    x:750,y:300,size:26,
+    spd:2.6,
+    cool:0
+  }
+
+  survivors=[]
+  for(let i=0;i<4;i++){
+    survivors.push({
+      x:200+Math.random()*400,
+      y:120+Math.random()*300,
+      size:18,
+      hp:60,
+      dirX:0,
+      dirY:0
+    })
+  }
+
+  walls=[
+    {x:300,y:150,w:300,h:20},
+    {x:300,y:380,w:300,h:20},
+    {x:200,y:250,w:20,h:150},
+    {x:680,y:250,w:20,h:150}
+  ]
+
+  hp.textContent=player.hp
+  role.textContent=isKiller?"🔪 KILLER":"🎮 SURVIVOR"
+
+  loop()
 }
 
-killer={
-x:700,y:300,size:26,
-spd:3,cool:0
-}
-
-survivors=[]
-for(let i=0;i<3;i++){
-survivors.push({
-x:200+Math.random()*400,
-y:100+Math.random()*300,
-size:18,hp:60
-})
-}
-
-walls=[
-{x:300,y:150,w:300,h:20},
-{x:300,y:380,w:300,h:20},
-{x:200,y:250,w:20,h:150},
-{x:680,y:250,w:20,h:150}
-]
-
-hp.textContent=player.hp
-role.textContent=isKiller?"🔪 KILLER":"🎮 SURVIVOR"
-
-loop()
-}
-
-function collide(a,b){
-return a.x<a.x+b.w&&a.x+a.size>b.x&&a.y<a.y+b.h&&a.y+a.size>b.y
-}
-
+// ===== COLLISION =====
 function move(ent,dx,dy){
-ent.x+=dx; ent.y+=dy
-for(let w of walls){
-if(ent.x<w.x+w.w&&ent.x+ent.size>w.x&&ent.y<w.y+w.h&&ent.y+ent.size>w.y){
-ent.x-=dx; ent.y-=dy
-}
-}
+  ent.x+=dx
+  ent.y+=dy
+  for(let w of walls){
+    if(ent.x<w.x+w.w&&ent.x+ent.size>w.x&&
+       ent.y<w.y+w.h&&ent.y+ent.size>w.y){
+      ent.x-=dx
+      ent.y-=dy
+    }
+  }
 }
 
+function moveAI(ent,dx,dy){
+  let ox=ent.x, oy=ent.y
+  ent.x+=dx
+  ent.y+=dy
+  for(let w of walls){
+    if(ent.x<w.x+w.w&&ent.x+ent.size>w.x&&
+       ent.y<w.y+w.h&&ent.y+ent.size>w.y){
+      ent.x=ox
+      ent.y=oy
+      return false
+    }
+  }
+  return true
+}
+
+// ===== UPDATE =====
 function update(){
-if(isKiller){
-if(keys.w) move(killer,0,-killer.spd)
-if(keys.s) move(killer,0,killer.spd)
-if(keys.a) move(killer,-killer.spd,0)
-if(keys.d) move(killer,killer.spd,0)
-}else{
-if(keys.w) move(player,0,-player.spd)
-if(keys.s) move(player,0,player.spd)
-if(keys.a) move(player,-player.spd,0)
-if(keys.d) move(player,player.spd,0)
 
-let t=[player,...survivors].filter(s=>s.hp>0)
-let target=t[Math.floor(Math.random()*t.length)]
-let dx=target.x-killer.x,dy=target.y-killer.y
-let d=Math.hypot(dx,dy)
-if(d>0){
-move(killer,dx/d*killer.spd,dy/d*killer.spd)
+  // PLAYER / KILLER CONTROL
+  if(isKiller){
+    if(keys.w) move(killer,0,-killer.spd)
+    if(keys.s) move(killer,0,killer.spd)
+    if(keys.a) move(killer,-killer.spd,0)
+    if(keys.d) move(killer,killer.spd,0)
+  }else{
+    if(keys.w) move(player,0,-player.spd)
+    if(keys.s) move(player,0,player.spd)
+    if(keys.a) move(player,-player.spd,0)
+    if(keys.d) move(player,player.spd,0)
+  }
+
+  // ===== SURVIVOR IA =====
+  survivors.forEach(s=>{
+    if(s.hp<=0) return
+    let dx=s.x-killer.x
+    let dy=s.y-killer.y
+    let d=Math.hypot(dx,dy)
+
+    if(d<160){
+      moveAI(s,(dx/d)*2,(dy/d)*2)
+    }else{
+      if(Math.random()<0.02){
+        s.dirX=Math.random()*2-1
+        s.dirY=Math.random()*2-1
+      }
+      moveAI(s,s.dirX*1.2,s.dirY*1.2)
+    }
+  })
+
+  // ===== KILLER IA =====
+  if(!isKiller){
+    let targets=[player,...survivors].filter(t=>t.hp>0)
+    let target=targets.reduce((a,b)=>{
+      let da=Math.hypot(a.x-killer.x,a.y-killer.y)
+      let db=Math.hypot(b.x-killer.x,b.y-killer.y)
+      return db<da?b:a
+    })
+
+    let dx=target.x-killer.x
+    let dy=target.y-killer.y
+    let d=Math.hypot(dx,dy)
+
+    if(d>1){
+      let mx=(dx/d)*killer.spd
+      let my=(dy/d)*killer.spd
+      if(!moveAI(killer,mx,my)){
+        moveAI(killer,my,-mx)
+      }
+    }
+
+    if(d<40 && killer.cool<=0){
+      target.hp-=15
+      killer.cool=60
+      if(target===player){
+        hp.textContent=player.hp
+        if(player.hp<=0) end("💀 MORISTE")
+      }
+    }
+  }
+
+  if(killer.cool>0) killer.cool--
 }
 
-if(d<40 && killer.cool<=0){
-target.hp-=15
-killer.cool=60
-if(target===player){
-hp.textContent=player.hp
-if(player.hp<=0) end("💀 MORISTE")
-}
-}
-}
-
-if(killer.cool>0) killer.cool--
-}
-
+// ===== DRAW =====
 function draw(){
-ctx.clearRect(0,0,c.width,c.height)
+  ctx.clearRect(0,0,c.width,c.height)
 
-ctx.fillStyle="#333"
-walls.forEach(w=>ctx.fillRect(w.x,w.y,w.w,w.h))
+  ctx.fillStyle="#333"
+  walls.forEach(w=>ctx.fillRect(w.x,w.y,w.w,w.h))
 
-ctx.fillStyle="#22c55e"
-ctx.fillRect(player.x,player.y,player.size,player.size)
+  ctx.fillStyle="#22c55e"
+  ctx.fillRect(player.x,player.y,player.size,player.size)
 
-ctx.fillStyle="#0ea5e9"
-survivors.forEach(s=>s.hp>0&&ctx.fillRect(s.x,s.y,s.size,s.size))
+  ctx.fillStyle="#0ea5e9"
+  survivors.forEach(s=>s.hp>0&&ctx.fillRect(s.x,s.y,s.size,s.size))
 
-ctx.fillStyle="#ef4444"
-ctx.fillRect(killer.x,killer.y,killer.size,killer.size)
+  ctx.fillStyle="#ef4444"
+  ctx.fillRect(killer.x,killer.y,killer.size,killer.size)
 }
 
+// ===== LOOP =====
 function loop(){
-update()
-draw()
-requestAnimationFrame(loop)
+  update()
+  draw()
+  requestAnimationFrame(loop)
 }
 
 function end(msg){
-alert(msg)
-location.reload()
+  alert(msg)
+  location.reload()
 }
 </script>
 
