@@ -89,23 +89,29 @@ function startGame(cls){
     cls=Object.keys(CLASSES)[Math.floor(Math.random()*4)]
   }
 
+  // 🔵 JUGADOR (AZUL)
   player={
     x:120,y:120,size:20,
     spd:CLASSES[cls].spd,
     hp:CLASSES[cls].hp
   }
 
+  // 🔴 KILLER
   killer={
     x:750,y:300,size:26,
     spd:2.6,
     cool:0
   }
 
+  // 🟩 SPAWN GRUPAL DE SURVIVORS
   survivors=[]
+  const spawnX=150
+  const spawnY=150
+
   for(let i=0;i<4;i++){
     survivors.push({
-      x:200+Math.random()*400,
-      y:120+Math.random()*300,
+      x:spawnX+Math.random()*15,
+      y:spawnY+Math.random()*15,
       size:18,
       hp:60,
       dirX:0,
@@ -113,6 +119,7 @@ function startGame(cls){
     })
   }
 
+  // 🧱 PAREDES
   walls=[
     {x:300,y:150,w:300,h:20},
     {x:300,y:380,w:300,h:20},
@@ -126,7 +133,7 @@ function startGame(cls){
   loop()
 }
 
-// ===== COLLISION =====
+// ===== MOVIMIENTO Y COLISION =====
 function move(ent,dx,dy){
   ent.x+=dx
   ent.y+=dy
@@ -157,7 +164,7 @@ function moveAI(ent,dx,dy){
 // ===== UPDATE =====
 function update(){
 
-  // PLAYER / KILLER CONTROL
+  // CONTROL
   if(isKiller){
     if(keys.w) move(killer,0,-killer.spd)
     if(keys.s) move(killer,0,killer.spd)
@@ -170,7 +177,7 @@ function update(){
     if(keys.d) move(player,player.spd,0)
   }
 
-  // ===== SURVIVOR IA =====
+  // 🟩 SURVIVOR IA
   survivors.forEach(s=>{
     if(s.hp<=0) return
     let dx=s.x-killer.x
@@ -188,7 +195,7 @@ function update(){
     }
   })
 
-  // ===== KILLER IA =====
+  // 🔴 KILLER IA
   if(!isKiller){
     let targets=[player,...survivors].filter(t=>t.hp>0)
     let target=targets.reduce((a,b)=>{
@@ -229,12 +236,15 @@ function draw(){
   ctx.fillStyle="#333"
   walls.forEach(w=>ctx.fillRect(w.x,w.y,w.w,w.h))
 
-  ctx.fillStyle="#22c55e"
+  // 🔵 JUGADOR
+  ctx.fillStyle="#2563eb"
   ctx.fillRect(player.x,player.y,player.size,player.size)
 
-  ctx.fillStyle="#0ea5e9"
+  // 🟩 SURVIVORS
+  ctx.fillStyle="#22c55e"
   survivors.forEach(s=>s.hp>0&&ctx.fillRect(s.x,s.y,s.size,s.size))
 
+  // 🔴 KILLER
   ctx.fillStyle="#ef4444"
   ctx.fillRect(killer.x,killer.y,killer.size,killer.size)
 }
