@@ -73,7 +73,7 @@ let player,isKiller,killer,walls=[],survivors=[]
 // ===== MENU =====
 function openChars(){ characters.style.display="flex" }
 
-// ===== START =====
+// ===== START GAME =====
 function startGame(cls){
   menu.style.display="none"
   game.style.display="block"
@@ -83,7 +83,7 @@ function startGame(cls){
 
   player={x:120,y:120,size:20,spd:CLASSES[cls].spd,hp:CLASSES[cls].hp}
 
-  killer={x:750,y:300,size:26,spd:5,cool:0,stuck:0}
+  killer={x:750,y:300,size:26,spd:5,cool:0}
 
   survivors=[]
   const spawnX=150, spawnY=150
@@ -107,36 +107,44 @@ function startGame(cls){
   loop()
 }
 
-// ===== LIMITES DEL MAPA =====
+// ===== LIMITES =====
 function clamp(ent){
   ent.x=Math.max(0,Math.min(c.width-ent.size,ent.x))
   ent.y=Math.max(0,Math.min(c.height-ent.size,ent.y))
 }
 
-// ===== MOVIMIENTO =====
+// ===== COLISION =====
+function collides(ent){
+  return walls.some(w=>
+    ent.x<w.x+w.w&&ent.x+ent.size>w.x&&
+    ent.y<w.y+w.h&&ent.y+ent.size>w.y
+  )
+}
+
 function move(ent,dx,dy){
   ent.x+=dx; ent.y+=dy
-  for(let w of walls){
-    if(ent.x<w.x+w.w&&ent.x+ent.size>w.x&&
-       ent.y<w.y+w.h&&ent.y+ent.size>w.y){
-      ent.x-=dx; ent.y-=dy
-    }
-  }
+  if(collides(ent)){ ent.x-=dx; ent.y-=dy }
   clamp(ent)
 }
 
-function moveAI(ent,dx,dy){
+// 🔥 MOVIMIENTO ESPECIAL DEL KILLER
+function moveKillerSmart(ent,dx,dy){
   let ox=ent.x, oy=ent.y
+
+  // intento directo
   ent.x+=dx; ent.y+=dy
-  for(let w of walls){
-    if(ent.x<w.x+w.w&&ent.x+ent.size>w.x&&
-       ent.y<w.y+w.h&&ent.y+ent.size>w.y){
-      ent.x=ox; ent.y=oy
-      return false
-    }
-  }
-  clamp(ent)
-  return true
+  if(!collides(ent)){ clamp(ent); return }
+
+  // intento solo X
+  ent.x=ox+dx; ent.y=oy
+  if(!collides(ent)){ clamp(ent); return }
+
+  // intento solo Y
+  ent.x=ox; ent.y=oy+dy
+  if(!collides(ent)){ clamp(ent); return }
+
+  // nada funcionó → retrocede
+  ent.x=ox; ent.y=oy
 }
 
 // ===== UPDATE =====
@@ -161,17 +169,17 @@ function update(){
     let dx=s.x-killer.x, dy=s.y-killer.y
     let d=Math.hypot(dx,dy)
     if(d<180){
-      moveAI(s,(dx/d)*2,(dy/d)*2)
+      move(s,(dx/d)*2,(dy/d)*2)
     }else{
       if(Math.random()<0.02){
         s.dirX=Math.random()*2-1
         s.dirY=Math.random()*2-1
       }
-      moveAI(s,s.dirX*1.2,s.dirY*1.2)
+      move(s,s.dirX*1.2,s.dirY*1.2)
     }
   })
 
-  // KILLER IA AVANZADA
+  // 🔴 KILLER IA INTELIGENTE
   if(!isKiller){
     let targets=[player,...survivors].filter(t=>t.hp>0)
     let target=targets.reduce((a,b)=>{
@@ -184,12 +192,7 @@ function update(){
     let d=Math.hypot(dx,dy)
 
     if(d>1){
-      let mx=(dx/d)*killer.spd
-      let my=(dy/d)*killer.spd
-      if(!moveAI(killer,mx,my)){
-        killer.stuck++
-        moveAI(killer,my,-mx)
-      }else killer.stuck=0
+      moveKillerSmart(killer,(dx/d)*killer.spd,(dy/d)*killer.spd)
     }
 
     if(d<40 && killer.cool<=0){
@@ -237,3 +240,4 @@ function end(msg){
 
 </body>
 </html>
+
