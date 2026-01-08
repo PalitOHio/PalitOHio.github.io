@@ -3,241 +3,199 @@
 <head>
 <meta charset="UTF-8">
 <title>Survive The Night</title>
-
 <style>
 *{box-sizing:border-box;font-family:Arial}
 body{margin:0;background:black;color:white;overflow:hidden}
 #menu,#game{position:fixed;inset:0}
 #menu{display:flex;flex-direction:column;align-items:center;justify-content:center}
-button{
-  padding:14px 30px;
-  font-size:18px;
-  border:none;
-  border-radius:10px;
-  background:#ef4444;
-  color:white;
-  cursor:pointer
-}
+button{padding:14px 30px;font-size:18px;border:none;border-radius:10px;background:#ef4444;color:white;cursor:pointer}
 #characters{display:none;gap:10px;margin-top:25px}
-.character{
-  width:140px;
-  padding:10px;
-  border:2px solid #444;
-  border-radius:10px;
-  text-align:center;
-  cursor:pointer
-}
+.character{width:140px;padding:10px;border:2px solid #444;border-radius:10px;text-align:center;cursor:pointer}
 canvas{display:block;margin:auto;background:#111}
 #hud{position:fixed;top:10px;left:10px}
 #role{position:fixed;top:10px;right:10px}
+#ability{position:fixed;bottom:10px;left:50%;transform:translateX(-50%)}
+#bar{height:10px;background:#22c55e;margin-top:5px}
+#hover{position:fixed;pointer-events:none;font-size:14px}
 </style>
 </head>
 
 <body>
 
 <div id="menu">
-  <h1>🔪 SURVIVE THE NIGHT</h1>
-  <button onclick="openChars()">PLAY</button>
-  <div id="characters">
-    <div class="character" onclick="startGame('Runner')">Runner</div>
-    <div class="character" onclick="startGame('Medic')">Medic</div>
-    <div class="character" onclick="startGame('Tank')">Tank</div>
-    <div class="character" onclick="startGame('Sneaky')">Sneaky</div>
-  </div>
+<h1>🔪 SURVIVE THE NIGHT</h1>
+<button onclick="openChars()">PLAY</button>
+<div id="characters">
+<div class="character" onclick="startGame('Runner')">Runner</div>
+<div class="character" onclick="startGame('Medic')">Medic</div>
+<div class="character" onclick="startGame('Tank')">Tank</div>
+<div class="character" onclick="startGame('Sneaky')">Sneaky</div>
+</div>
 </div>
 
 <div id="game" style="display:none">
-  <div id="hud">❤️ <span id="hp"></span></div>
-  <div id="role"></div>
-  <canvas id="c" width="900" height="550"></canvas>
+<div id="hud">❤️ <span id="hp"></span></div>
+<div id="role"></div>
+<div id="ability"></div>
+<div id="hover"></div>
+<canvas id="c" width="900" height="550"></canvas>
 </div>
 
 <script>
-const c=document.getElementById("c")
-const ctx=c.getContext("2d")
+const c=document.getElementById("c"),ctx=c.getContext("2d")
+const abilityUI=document.getElementById("ability")
+const hover=document.getElementById("hover")
 
-let keys={}
+let keys={},mouse={x:0,y:0}
 document.onkeydown=e=>keys[e.key]=true
 document.onkeyup=e=>keys[e.key]=false
+document.onmousemove=e=>{mouse.x=e.clientX;mouse.y=e.clientY}
 
-// ===== CLASES =====
 const CLASSES={
-  Runner:{spd:3,hp:100},
-  Medic:{spd:3.5,hp:80},
-  Tank:{spd:1,hp:150},
-  Sneaky:{spd:4,hp:90}
+Runner:{spd:3,hp:100},
+Medic:{spd:3.5,hp:80},
+Tank:{spd:1,hp:150},
+Sneaky:{spd:4,hp:90}
 }
 
-let player,isKiller,killer,walls=[],survivors=[]
+let player,killer,isKiller,cls
+let survivors=[],walls=[]
+let ability={active:false,timer:0,cool:0}
 
-// ===== MENU =====
-function openChars(){ characters.style.display="flex" }
+function openChars(){characters.style.display="flex"}
 
-// ===== START GAME =====
-function startGame(cls){
-  menu.style.display="none"
-  game.style.display="block"
+function startGame(c){
+cls=c
+menu.style.display="none"
+game.style.display="block"
 
-  isKiller=Math.random()<0.2
-  if(isKiller) cls=Object.keys(CLASSES)[Math.floor(Math.random()*4)]
+player={x:120,y:120,size:20,spd:CLASSES[c].spd,baseSpd:CLASSES[c].spd,hp:CLASSES[c].hp,invis:false}
+killer={x:750,y:300,size:26,spd:5,cool:0,stun:0}
 
-  player={x:120,y:120,size:20,spd:CLASSES[cls].spd,hp:CLASSES[cls].hp}
+survivors=[]
+for(let i=0;i<4;i++)survivors.push({x:150+Math.random()*10,y:150+Math.random()*10,size:18,hp:60})
 
-  killer={x:750,y:300,size:26,spd:5,cool:0}
+walls=[{x:300,y:150,w:300,h:20},{x:300,y:380,w:300,h:20},{x:200,y:250,w:20,h:150},{x:680,y:250,w:20,h:150}]
 
-  survivors=[]
-  const spawnX=150, spawnY=150
-  for(let i=0;i<4;i++){
-    survivors.push({
-      x:spawnX+Math.random()*10,
-      y:spawnY+Math.random()*10,
-      size:18,hp:60,dirX:0,dirY:0
-    })
-  }
-
-  walls=[
-    {x:300,y:150,w:300,h:20},
-    {x:300,y:380,w:300,h:20},
-    {x:200,y:250,w:20,h:150},
-    {x:680,y:250,w:20,h:150}
-  ]
-
-  hp.textContent=player.hp
-  role.textContent=isKiller?"🔪 KILLER":"🎮 SURVIVOR"
-  loop()
+hp.textContent=player.hp
+role.textContent="🎮 SURVIVOR ("+cls+")"
+loop()
 }
 
-// ===== LIMITES =====
-function clamp(ent){
-  ent.x=Math.max(0,Math.min(c.width-ent.size,ent.x))
-  ent.y=Math.max(0,Math.min(c.height-ent.size,ent.y))
+function clamp(e){
+e.x=Math.max(0,Math.min(c.width-e.size,e.x))
+e.y=Math.max(0,Math.min(c.height-e.size,e.y))
 }
 
-// ===== COLISION =====
-function collides(ent){
-  return walls.some(w=>
-    ent.x<w.x+w.w&&ent.x+ent.size>w.x&&
-    ent.y<w.y+w.h&&ent.y+ent.size>w.y
-  )
+function collide(e){
+return walls.some(w=>e.x<w.x+w.w&&e.x+e.size>w.x&&e.y<w.y+w.h&&e.y+e.size>w.y)
 }
 
-function move(ent,dx,dy){
-  ent.x+=dx; ent.y+=dy
-  if(collides(ent)){ ent.x-=dx; ent.y-=dy }
-  clamp(ent)
+function move(e,dx,dy){
+e.x+=dx;e.y+=dy
+if(collide(e)){e.x-=dx;e.y-=dy}
+clamp(e)
 }
 
-// 🔥 MOVIMIENTO ESPECIAL DEL KILLER
-function moveKillerSmart(ent,dx,dy){
-  let ox=ent.x, oy=ent.y
+// ===== HABILIDADES =====
+function useAbility(){
+if(ability.cool>0)return
 
-  // intento directo
-  ent.x+=dx; ent.y+=dy
-  if(!collides(ent)){ clamp(ent); return }
+if(cls==="Runner"){
+ability.active=true;ability.timer=300;ability.cool=900
+player.spd=9
+}
 
-  // intento solo X
-  ent.x=ox+dx; ent.y=oy
-  if(!collides(ent)){ clamp(ent); return }
+if(cls==="Medic"){
+let targets=[...survivors,player].filter(s=>s.hp>0)
+let t=targets.reduce((a,b)=>Math.hypot(b.x-player.x,b.y-player.y)<Math.hypot(a.x-player.x,a.y-player.y)?b:a)
+t.hp=Math.min(t.hp+70,150)
+player.hp=Math.min(player.hp+5,CLASSES.Medic.hp)
+hp.textContent=player.hp
+ability.cool=1200
+}
 
-  // intento solo Y
-  ent.x=ox; ent.y=oy+dy
-  if(!collides(ent)){ clamp(ent); return }
+if(cls==="Tank"){
+ability.active=true;ability.timer=300;ability.cool=1500
+}
 
-  // nada funcionó → retrocede
-  ent.x=ox; ent.y=oy
+if(cls==="Sneaky"){
+ability.active=true;ability.timer=600;ability.cool=1500
+player.invis=true
+}
+}
+
+function updateAbility(){
+if(ability.active){
+ability.timer--
+if(ability.timer<=0){
+ability.active=false
+player.spd=player.baseSpd
+player.invis=false
+}
+}
+if(ability.cool>0)ability.cool--
 }
 
 // ===== UPDATE =====
 function update(){
+if(keys.q){keys.q=false;useAbility()}
 
-  // CONTROL
-  if(isKiller){
-    if(keys.w) move(killer,0,-killer.spd)
-    if(keys.s) move(killer,0,killer.spd)
-    if(keys.a) move(killer,-killer.spd,0)
-    if(keys.d) move(killer,killer.spd,0)
-  }else{
-    if(keys.w) move(player,0,-player.spd)
-    if(keys.s) move(player,0,player.spd)
-    if(keys.a) move(player,-player.spd,0)
-    if(keys.d) move(player,player.spd,0)
-  }
+if(keys.w)move(player,0,-player.spd)
+if(keys.s)move(player,0,player.spd)
+if(keys.a)move(player,-player.spd,0)
+if(keys.d)move(player,player.spd,0)
 
-  // SURVIVORS IA
-  survivors.forEach(s=>{
-    if(s.hp<=0) return
-    let dx=s.x-killer.x, dy=s.y-killer.y
-    let d=Math.hypot(dx,dy)
-    if(d<180){
-      move(s,(dx/d)*2,(dy/d)*2)
-    }else{
-      if(Math.random()<0.02){
-        s.dirX=Math.random()*2-1
-        s.dirY=Math.random()*2-1
-      }
-      move(s,s.dirX*1.2,s.dirY*1.2)
-    }
-  })
+// Killer AI
+if(killer.stun>0){killer.stun--}
+else{
+let targets=[player,...survivors].filter(t=>t.hp>0&&!t.invis)
+let t=targets.reduce((a,b)=>Math.hypot(b.x-killer.x,b.y-killer.y)<Math.hypot(a.x-killer.x,a.y-killer.y)?b:a)
+let dx=t.x-killer.x,dy=t.y-killer.y,d=Math.hypot(dx,dy)
+if(d>1)move(killer,(dx/d)*killer.spd,(dy/d)*killer.spd)
+if(d<40&&killer.cool<=0){
+if(cls==="Tank"&&ability.active){
+player.hp=Math.min(player.hp+20,CLASSES.Tank.hp)
+killer.stun=300
+}else{
+player.hp-=15
+}
+hp.textContent=player.hp
+killer.cool=45
+}
+}
 
-  // 🔴 KILLER IA INTELIGENTE
-  if(!isKiller){
-    let targets=[player,...survivors].filter(t=>t.hp>0)
-    let target=targets.reduce((a,b)=>{
-      return Math.hypot(b.x-killer.x,b.y-killer.y)
-           < Math.hypot(a.x-killer.x,a.y-killer.y) ? b : a
-    })
-
-    let dx=target.x-killer.x
-    let dy=target.y-killer.y
-    let d=Math.hypot(dx,dy)
-
-    if(d>1){
-      moveKillerSmart(killer,(dx/d)*killer.spd,(dy/d)*killer.spd)
-    }
-
-    if(d<40 && killer.cool<=0){
-      target.hp-=15
-      killer.cool=45
-      if(target===player){
-        hp.textContent=player.hp
-        if(player.hp<=0) end("💀 MORISTE")
-      }
-    }
-  }
-
-  if(killer.cool>0) killer.cool--
+if(killer.cool>0)killer.cool--
+updateAbility()
 }
 
 // ===== DRAW =====
 function draw(){
-  ctx.clearRect(0,0,c.width,c.height)
+ctx.clearRect(0,0,c.width,c.height)
+ctx.fillStyle="#333";walls.forEach(w=>ctx.fillRect(w.x,w.y,w.w,w.h))
 
-  ctx.fillStyle="#333"
-  walls.forEach(w=>ctx.fillRect(w.x,w.y,w.w,w.h))
+ctx.fillStyle=player.invis?"rgba(37,99,235,0.2)":"#2563eb"
+ctx.fillRect(player.x,player.y,player.size,player.size)
 
-  ctx.fillStyle="#2563eb"
-  ctx.fillRect(player.x,player.y,player.size,player.size)
+ctx.fillStyle="#22c55e"
+survivors.forEach(s=>ctx.fillRect(s.x,s.y,s.size,s.size))
 
-  ctx.fillStyle="#22c55e"
-  survivors.forEach(s=>s.hp>0&&ctx.fillRect(s.x,s.y,s.size,s.size))
+ctx.fillStyle="#ef4444"
+ctx.fillRect(killer.x,killer.y,killer.size,killer.size)
 
-  ctx.fillStyle="#ef4444"
-  ctx.fillRect(killer.x,killer.y,killer.size,killer.size)
+// HUD habilidad
+abilityUI.innerHTML="Q habilidad | CD: "+Math.ceil(ability.cool/60)
+if(ability.active){
+abilityUI.innerHTML+="<div id='bar' style='width:"+(ability.timer/6)+"px'></div>"
+}
 }
 
 // ===== LOOP =====
 function loop(){
-  update()
-  draw()
-  requestAnimationFrame(loop)
-}
-
-function end(msg){
-  alert(msg)
-  location.reload()
+update();draw()
+requestAnimationFrame(loop)
 }
 </script>
 
 </body>
 </html>
-
